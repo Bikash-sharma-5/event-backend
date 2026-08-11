@@ -1,99 +1,159 @@
+
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const path = require('path');
-const fs = require('fs');
-const { isAdmin, authenticateToken } = require('../middleware/auth');
+
+const { isAdmin, authenticateToken } = require("../middleware/auth");
+
 const {
   getAllFeaturedProducts,
   getFeaturedProduct,
   createFeaturedProductWithFiles,
   updateFeaturedProductWithFiles,
-  deleteFeaturedProduct
-} = require('../controllers/featuredProductController');
+  deleteFeaturedProduct,
+} = require("../controllers/featuredProductController");
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, '../data/featured-products');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// ============================================================
+// MULTER CONFIGURATION
+// IMPORTANT: Do NOT use diskStorage() on Vercel.
+// ============================================================
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, 'featured-' + uniqueSuffix + ext);
-  }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
+
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10 MB per image
+    files: 10,
   },
+
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype && file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'), false);
+      cb(new Error("Only image files are allowed!"), false);
     }
-  }
+  },
 });
 
-// Upload multiple images (main image + 9 additional images)
+// ============================================================
+// UPLOAD FIELDS
+// ============================================================
+
 const uploadImages = upload.fields([
-  { name: 'mainImage', maxCount: 1 },
-  { name: 'image1', maxCount: 1 },
-  { name: 'image2', maxCount: 1 },
-  { name: 'image3', maxCount: 1 },
-  { name: 'image4', maxCount: 1 },
-  { name: 'image5', maxCount: 1 },
-  { name: 'image6', maxCount: 1 },
-  { name: 'image7', maxCount: 1 },
-  { name: 'image8', maxCount: 1 },
-  { name: 'image9', maxCount: 1 }
+  { name: "mainImage", maxCount: 1 },
+  { name: "image1", maxCount: 1 },
+  { name: "image2", maxCount: 1 },
+  { name: "image3", maxCount: 1 },
+  { name: "image4", maxCount: 1 },
+  { name: "image5", maxCount: 1 },
+  { name: "image6", maxCount: 1 },
+  { name: "image7", maxCount: 1 },
+  { name: "image8", maxCount: 1 },
+  { name: "image9", maxCount: 1 },
 ]);
 
-// Middleware to handle multer upload
+// ============================================================
+// MULTER ERROR HANDLER
+// ============================================================
+
 const handleUpload = (req, res, next) => {
-  uploadImages(req, res, function (err) {
+  uploadImages(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      return res.status(400).json({ error: 'File upload error', details: err.message });
-    } else if (err) {
-      return res.status(500).json({ error: 'File upload error', details: err.message });
+      return res.status(400).json({
+        success: false,
+        error: "File upload error",
+        details: err.message,
+      });
     }
+
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        error: "File upload error",
+        details: err.message,
+      });
+    }
+
     next();
   });
 };
 
-// Middleware to transform local paths to URLs
-const transformPathsToUrls = (req, res, next) => {
-  if (req.files) {
-    const baseUrl = process.env.BACKEND_URL || 'https://api.decoryy.com';
+// ============================================================
+// VALIDATE FILES
+// ============================================================
 
-    Object.keys(req.files).forEach(key => {
-      req.files[key].forEach(file => {
-        // Convert absolute path to URL
-        const filename = file.filename;
-        file.path = `${baseUrl}/decoryy/data/featured-products/${filename}`;
-      });
-    });
+const validateFiles = (req, res, next) => {
+  if (!req.files) {
+    return next();
   }
+
+  for (const fieldName of Object.keys(req.files)) {
+    const files = req.files[fieldName];
+
+    if (!Array.isArray(files)) {
+      continue;
+    }
+
+    for (const file of files) {
+      if (!file.buffer) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid uploaded file: ${fieldName}`,
+        });
+      }
+    }
+  }
+
   next();
 };
 
-// Public routes
+// ============================================================
+// PUBLIC ROUTES
+// ============================================================
+
 router.get("/", getAllFeaturedProducts);
+
 router.get("/:id", getFeaturedProduct);
 
-// Admin routes
-router.post("/", authenticateToken, isAdmin, handleUpload, transformPathsToUrls, createFeaturedProductWithFiles);
-router.post("/upload", authenticateToken, isAdmin, handleUpload, transformPathsToUrls, createFeaturedProductWithFiles);
-router.put("/:id", authenticateToken, isAdmin, handleUpload, transformPathsToUrls, updateFeaturedProductWithFiles);
-router.delete("/:id", authenticateToken, isAdmin, deleteFeaturedProduct);
+// ============================================================
+// ADMIN ROUTES
+// ============================================================
 
-module.exports = router; 
+router.post(
+  "/",
+  authenticateToken,
+  isAdmin,
+  handleUpload,
+  validateFiles,
+  createFeaturedProductWithFiles
+);
+
+router.post(
+  "/upload",
+  authenticateToken,
+  isAdmin,
+  handleUpload,
+  validateFiles,
+  createFeaturedProductWithFiles
+);
+
+router.put(
+  "/:id",
+  authenticateToken,
+  isAdmin,
+  handleUpload,
+  validateFiles,
+  updateFeaturedProductWithFiles
+);
+
+router.delete(
+  "/:id",
+  authenticateToken,
+  isAdmin,
+  deleteFeaturedProduct
+);
+
+module.exports = router;
+
