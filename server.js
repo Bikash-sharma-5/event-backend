@@ -263,8 +263,15 @@ async function startServer() {
   }
 }
  
-if (require.main === module) {
-    startServer();
-}
+mongoose.connect(MONGODB_URI, {
+  serverSelectionTimeoutMS: 15000,
+  socketTimeoutMS: 45000,
+})
+.then(() => {
+  console.log("✅ MongoDB connected successfully");
+})
+.catch((error) => {
+  console.error("❌ MongoDB connection failed:", error.message);
+});
 
 module.exports = app;
