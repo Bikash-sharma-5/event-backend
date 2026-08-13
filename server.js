@@ -221,7 +221,7 @@ app.use((err, req, res, next) => {
   });
 });
  
-const PORT = process.env.PORT || 5175;
+const PORT = process.env.PORT || 5000;
  
 const httpServer = http.createServer(app);
 const io = initSocket(httpServer);
@@ -233,24 +233,18 @@ async function startServer() {
   try {
     console.log('Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 15000, 
       socketTimeoutMS: 45000,
     });
     console.log("✅ MongoDB connected successfully");
- 
-    // ◄ Initialize WhatsApp AFTER MongoDB is ready — RemoteAuth needs the DB
-    // initWhatsApp();
-    console.log('📱 WhatsApp client initializing...');
- 
+
     try {
       await settingsController.initializeDefaultSettings();
       console.log('Default settings initialized successfully');
     } catch (error) {
       console.error('Failed to initialize default settings:', error);
     }
- 
+
     startMatchmakingSweep();
     console.log('Matchmaking sweep job started');
  
@@ -259,11 +253,15 @@ async function startServer() {
       console.log('Server is ready to accept requests');
     });
   } catch (error) {
-    console.error("Failed to connect to MongoDB:", error);
+    console.error("❌ Failed to connect to MongoDB:", error.message);
     process.exit(1); 
   }
 }
- 
+
+// Start the server
+startServer();
+
+module.exports = app;
 mongoose.connect(MONGODB_URI, {
   serverSelectionTimeoutMS: 15000,
   socketTimeoutMS: 45000,
