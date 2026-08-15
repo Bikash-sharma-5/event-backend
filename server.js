@@ -60,6 +60,7 @@ const allowedOrigins = [
   "https://event-frontend-kappa-sable.vercel.app",
   "https://event-admin-pearl.vercel.app",
   "https://www.apnadecorr.com",
+  "https://admin.apnadecorr.com"
 ];
  
 app.use(cors({
